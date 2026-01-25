@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Counterinsurgency Decision Support System</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/dist/Recharts.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .behavior-toggle {
+            transition: all 0.3s ease;
+        }
+        
+        .behavior-toggle:hover {
+            transform: scale(1.05);
+        }
+        
+        .behavior-toggle.active {
+            background: linear-gradient(135deg, #00ff88, #5f9fff);
+        }
+        
+        .action-card {
+            transition: all 0.3s ease;
+        }
+        
+        .action-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(95, 159, 255, 0.3);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
+
+        // Historical data from analysis
+        const HISTORICAL_DATA = {
+            casualtyRates: {
+                'None': 0.12,
+                'Structural': 1.60,
+                'Ideational': 4.67,
+                'Institutional': 0.10,
+                'Psychological': 0.13,
+                'Pos': 7.86,
+                'Structural+Ideational': 2.75,
+                'Structural+Institutional': 3.33,
+                'Structural+Pos': 7.86,
+                'Ideational+Institutional': 0.00,
+                'Structural+Ideational+Institutional': 0.00,
+                'Structural+Ideational+Pos': 20.33,
+                'Structural+Institutional+Pos': 8.90,
+                'Structural+Ideational+Institutional+Pos': 5.00,
+                'Structural+Ideational+Institutional+Psychological+Pos': 16.00,
+                'Structural+Institutional+Psychological+Pos': 5.67
+            },
+            positionalMultiplier: 8.42,
+            baseRate: 1.12
+        };
+
+        function CounterinsurgencyDashboard() {
+            const [insurgentBehaviors, setInsurgentBehaviors] = useState({
+                structural: true,
+                ideational: true,
+                institutional: false,
+                psychological: false,
+                positional: true
+            });
+
+            const [counterinsurgentBehaviors, setCounterinsurgentBehaviors] = useState({
+                structural: false,
+                ideational: false,
+                institutional: false,
+                psychological: false,
+                positional: false
+            });
+
+            const [simulations, setSimulations] = useState(1000);
+            const [days, setDays] = useState(30);
+            const [running, setRunning] = useState(false);
+            const [results, setResults] = useState(null);
+
+            const insurgentState = useMemo(() => {
+                const parts = [];
+                if (insurgentBehaviors.structural) parts.push('S');
+                if (insurgentBehaviors.ideational) parts.push('Id');
+                if (insurgentBehaviors.institutional) parts.push('In');
+                if (insurgentBehaviors.psychological) parts.push('P');
+                if (insurgentBehaviors.positional) parts.push('Pos');
+                return parts.length > 0 ? parts.join('+') : 'None';
+            }, [insurgentBehaviors]);
+
+            const counterinsurgentState = useMemo(() => {
+                const parts = [];
+                if (counterinsurgentBehaviors.structural) parts.push('Structural');
+                if (counterinsurgentBehaviors.ideational) parts.push('Ideational');
+                if (counterinsurgentBehaviors.institutional) parts.push('Institutional');
+                if (counterinsurgentBehaviors.psychological) parts.push('Psychological');
+                if (counterinsurgentBehaviors.positional) parts.push('Pos');
+                return parts.length > 0 ? parts.join('+') : 'None';
+            }, [counterinsurgentBehaviors]);
+
+            const currentActionCasualties = useMemo(() => {
+                let baseCasualties = HISTORICAL_DATA.casualtyRates[counterinsurgentState] || 
+                    (counterinsurgentBehaviors.positional ? HISTORICAL_DATA.baseRate * HISTORICAL_DATA.positionalMultiplier : HISTORICAL_DATA.baseRate);
+                
+                if (insurgentBehaviors.psychological) {
+                    baseCasualties *= 1.5;
+                }
+                
+                return baseCasualties;
+            }, [counterinsurgentState, counterinsurgentBehaviors, insurgentBehaviors]);
+
+            const counterinsurgentActions = useMemo(() => {
+                const actions = [];
+                for (let s = 0; s <= 1; s++) {
+                    for (let id = 0; id <= 1; id++) {
+                        for (let inst = 0; inst <= 1; inst++) {
+                            for (let p = 0; p <= 1; p++) {
+                                for (let pos = 0; pos <= 1; pos++) {
+                                    const parts = [];
+                                    if (s) parts.push('Structural');
+                                    if (id) parts.push('Ideational');
+                                    if (inst) parts.push('Institutional');
+                                    if (p) parts.push('Psychological');
+                                    if (pos) parts.push('Pos');
+                                    const name = parts.length > 0 ? parts.join('+') : 'None';
+                                    
+                                    let baseCasualties = HISTORICAL_DATA.casualtyRates[name] || 
+                                        (pos ? HISTORICAL_DATA.baseRate * HISTORICAL_DATA.positionalMultiplier : HISTORICAL_DATA.baseRate);
+                                    
+                                    if (insurgentBehaviors.psychological) {
+                                        baseCasualties *= 1.5;
+                                    }
+                                    
+                                    actions.push({
+                                        name,
+                                        behaviors: { s, id, inst, p, pos },
+                                        expectedCasualties: baseCasualties,
+                                        uncertainty: baseCasualties * 0.3
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                return actions.sort((a, b) => a.expectedCasualties - b.expectedCasualties);
+            }, [insurgentBehaviors]);
+
+            const calculatePayoffs = (counterinsurgentAction, insurgentState) => {
+                const casualties = counterinsurgentAction.expectedCasualties || currentActionCasualties;
+                const counterinsurgentPayoff = -casualties;
+                
+                let insurgentPayoff = 0;
+                if (counterinsurgentAction.name === 'None') {
+                    insurgentPayoff = 5;
+                } else if (counterinsurgentAction.behaviors?.pos) {
+                    insurgentPayoff = 3 + casualties * 0.5;
+                } else {
+                    insurgentPayoff = casualties * 0.3;
+                }
+                
+                return { counterinsurgentPayoff, insurgentPayoff };
+            };
+
+            const runSimulation = () => {
+                setRunning(true);
+                
+                setTimeout(() => {
+                    const simResults = [];
+                    
+                    for (let sim = 0; sim < simulations; sim++) {
+                        let totalCasualties = 0;
+                        
+                        for (let day = 0; day < days; day++) {
+                            const mean = currentActionCasualties;
+                            const stdDev = currentActionCasualties * 0.3;
+                            
+                            const u1 = Math.random();
+                            const u2 = Math.random();
+                            const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+                            const sample = Math.max(0, mean + z * stdDev);
+                            
+                            totalCasualties += sample;
+                        }
+                        
+                        simResults.push(totalCasualties);
+                    }
+                    
+                    simResults.sort((a, b) => a - b);
+                    const mean = simResults.reduce((a, b) => a + b, 0) / simulations;
+                    const median = simResults[Math.floor(simulations / 2)];
+                    const p5 = simResults[Math.floor(simulations * 0.05)];
+                    const p95 = simResults[Math.floor(simulations * 0.95)];
+                    
+                    const bins = 30;
+                    const min = Math.min(...simResults);
+                    const max = Math.max(...simResults);
+                    const binSize = (max - min) / bins;
+                    
+                    const distribution = Array.from({ length: bins }, (_, i) => {
+                        const binStart = min + i * binSize;
+                        const binEnd = binStart + binSize;
+                        const count = simResults.filter(r => r >= binStart && r < binEnd).length;
+                        return {
+                            casualties: Math.round(binStart + binSize / 2),
+                            frequency: count,
+                            probability: (count / simulations * 100).toFixed(1)
+                        };
+                    });
+                    
+                    setResults({
+                        mean,
+                        median,
+                        p5,
+                        p95,
+                        distribution,
+                        action: counterinsurgentState
+                    });
+                    
+                    setRunning(false);
+                }, 500);
+            };
+
+            const optimalAction = counterinsurgentActions[0];
+            const worstAction = counterinsurgentActions[counterinsurgentActions.length - 1];
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="text-center mb-12 fade-in">
+                            <h1 className="text-5xl font-bold mb-3 bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-transparent">
+                                COUNTERINSURGENCY DECISION SUPPORT SYSTEM
+                            </h1>
+                            <p className="text-slate-400 text-sm tracking-widest uppercase">
+                                Game Theoretic Analysis · Monte Carlo Simulation
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Insurgent Observation Panel */}
+                            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 fade-in">
+                                <h2 className="text-lg font-semibold text-emerald-400 mb-6 flex items-center gap-2">
+                                    <span>▸</span> Observed Insurgent Behaviors
+                                </h2>
+                                <div className="grid grid-cols-5 gap-3 mb-6">
+                                    {[
+                                        { key: 'structural', label: 'S', name: 'Structural' },
+                                        { key: 'ideational', label: 'Id', name: 'Ideational' },
+                                        { key: 'institutional', label: 'In', name: 'Institutional' },
+                                        { key: 'psychological', label: 'P', name: 'Psychological' },
+                                        { key: 'positional', label: 'Pos', name: 'Positional' }
+                                    ].map(behavior => (
+                                        <div
+                                            key={behavior.key}
+                                            className={`behavior-toggle cursor-pointer rounded-lg p-3 text-center border-2 ${
+                                                insurgentBehaviors[behavior.key]
+                                                    ? 'active border-emerald-400 text-slate-900'
+                                                    : 'bg-slate-800 border-slate-600 text-slate-300'
+                                            }`}
+                                            onClick={() => setInsurgentBehaviors(prev => ({
+                                                ...prev,
+                                                [behavior.key]: !prev[behavior.key]
+                                            }))}
+                                        >
+                                            <div className="text-xs font-semibold mb-1">{behavior.label}</div>
+                                            <div className="text-sm font-bold">{behavior.name}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-slate-800 border border-slate-600 rounded-lg p-4 text-center text-emerald-400 text-xl font-bold">
+                                    INSURGENT STATE: {insurgentState}
+                                </div>
+                            </div>
+
+                            {/* Counterinsurgent Response Panel */}
+                            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 fade-in">
+                                <h2 className="text-lg font-semibold text-emerald-400 mb-6 flex items-center gap-2">
+                                    <span>▸</span> Counterinsurgent Response
+                                </h2>
+                                <div className="grid grid-cols-5 gap-3 mb-6">
+                                    {[
+                                        { key: 'structural', label: 'Str', name: 'Structural' },
+                                        { key: 'ideational', label: 'Ide', name: 'Ideational' },
+                                        { key: 'institutional', label: 'Ins', name: 'Institutional' },
+                                        { key: 'psychological', label: 'Psy', name: 'Psychological' },
+                                        { key: 'positional', label: 'Pos', name: 'Positional' }
+                                    ].map(behavior => (
+                                        <div
+                                            key={behavior.key}
+                                            className={`behavior-toggle cursor-pointer rounded-lg p-3 text-center border-2 ${
+                                                counterinsurgentBehaviors[behavior.key]
+                                                    ? 'active border-emerald-400 text-slate-900'
+                                                    : 'bg-slate-800 border-slate-600 text-slate-300'
+                                            }`}
+                                            onClick={() => setCounterinsurgentBehaviors(prev => ({
+                                                ...prev,
+                                                [behavior.key]: !prev[behavior.key]
+                                            }))}
+                                        >
+                                            <div className="text-xs font-semibold mb-1">{behavior.label}</div>
+                                            <div className="text-sm font-bold">{behavior.name}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-slate-800 border border-slate-600 rounded-lg p-4 text-center mb-4">
+                                    <div className="text-emerald-400 text-xl font-bold mb-2">
+                                        {counterinsurgentState}
+                                    </div>
+                                    <div className="text-slate-400 text-sm">Selected Response</div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="bg-slate-800 rounded-lg p-3 text-center">
+                                        <div className="text-xs text-slate-400 uppercase mb-1">Expected</div>
+                                        <div className={`text-2xl font-bold ${
+                                            currentActionCasualties <= optimalAction.expectedCasualties * 1.2 ? 'text-emerald-400' :
+                                            currentActionCasualties >= worstAction.expectedCasualties * 0.5 ? 'text-red-400' :
+                                            'text-yellow-400'
+                                        }`}>
+                                            {currentActionCasualties.toFixed(1)}
+                                        </div>
+                                        <div className="text-xs text-slate-400">casualties/day</div>
+                                    </div>
+                                    <div className="bg-slate-800 rounded-lg p-3 text-center">
+                                        <div className="text-xs text-slate-400 uppercase mb-1">Best Option</div>
+                                        <div className="text-2xl font-bold text-emerald-400">{optimalAction.expectedCasualties.toFixed(1)}</div>
+                                        <div className="text-xs text-slate-400">{optimalAction.name}</div>
+                                    </div>
+                                    <div className="bg-slate-800 rounded-lg p-3 text-center">
+                                        <div className="text-xs text-slate-400 uppercase mb-1">Worst Option</div>
+                                        <div className="text-2xl font-bold text-red-400">{worstAction.expectedCasualties.toFixed(1)}</div>
+                                        <div className="text-xs text-slate-400">{worstAction.name}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Action Comparison */}
+                            <div className="lg:col-span-2 bg-slate-900 border border-slate-700 rounded-xl p-6 fade-in">
+                                <h2 className="text-lg font-semibold text-emerald-400 mb-6 flex items-center gap-2">
+                                    <span>▸</span> Action Comparison (Your Selection vs Top Options)
+                                </h2>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="border-4 border-blue-400 bg-blue-900/20 rounded-lg p-4">
+                                        <div className="text-xs text-blue-400 font-semibold mb-2 uppercase">Your Selection</div>
+                                        <div className="font-semibold mb-2">{counterinsurgentState}</div>
+                                        <div className={`text-2xl font-bold mb-1 ${
+                                            currentActionCasualties <= optimalAction.expectedCasualties * 1.2 ? 'text-emerald-400' :
+                                            currentActionCasualties >= worstAction.expectedCasualties * 0.5 ? 'text-red-400' :
+                                            'text-yellow-400'
+                                        }`}>
+                                            {currentActionCasualties.toFixed(2)}
+                                        </div>
+                                        <div className="text-xs text-slate-400">casualties/day</div>
+                                    </div>
+                                    
+                                    {counterinsurgentActions.slice(0, 3).map((action, idx) => (
+                                        <div
+                                            key={action.name}
+                                            className={`cursor-pointer rounded-lg p-4 border-2 ${
+                                                action.name === counterinsurgentState
+                                                    ? 'border-blue-400 bg-blue-900/20'
+                                                    : 'border-slate-600 bg-slate-800 hover:border-emerald-400'
+                                            }`}
+                                            onClick={() => {
+                                                const newBehaviors = {
+                                                    structural: action.name.includes('Structural'),
+                                                    ideational: action.name.includes('Ideational'),
+                                                    institutional: action.name.includes('Institutional'),
+                                                    psychological: action.name.includes('Psychological'),
+                                                    positional: action.name.includes('Pos')
+                                                };
+                                                setCounterinsurgentBehaviors(newBehaviors);
+                                            }}
+                                        >
+                                            <div className="text-xs text-emerald-400 font-semibold mb-2 uppercase">
+                                                #{idx + 1} Best Option
+                                            </div>
+                                            <div className="font-semibold mb-2">{action.name}</div>
+                                            <div className="text-2xl font-bold text-emerald-400 mb-1">
+                                                {action.expectedCasualties.toFixed(2)}
+                                            </div>
+                                            <div className="text-xs text-slate-400">casualties/day</div>
+                                            {idx === 0 && (
+                                                <div className="text-xs text-emerald-400 mt-2 font-semibold">✓ OPTIMAL</div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                {currentActionCasualties > optimalAction.expectedCasualties * 1.5 && (
+                                    <div className="mt-4 bg-red-900/20 border border-red-400 rounded-lg p-4">
+                                        <div className="text-red-400 font-semibold mb-2 flex items-center gap-2">
+                                            <span>⚠️</span> High Casualty Warning
+                                        </div>
+                                        <div className="text-sm text-slate-300">
+                                            Your selected action is expected to cause <strong>{currentActionCasualties.toFixed(1)}</strong> casualties/day.
+                                            The optimal action (<strong>{optimalAction.name}</strong>) would reduce this to <strong>{optimalAction.expectedCasualties.toFixed(1)}</strong> casualties/day,
+                                            saving <strong>{(currentActionCasualties - optimalAction.expectedCasualties).toFixed(1)}</strong> lives per day.
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {currentActionCasualties <= optimalAction.expectedCasualties * 1.2 && counterinsurgentState !== 'None' && (
+                                    <div className="mt-4 bg-emerald-900/20 border border-emerald-400 rounded-lg p-4">
+                                        <div className="text-emerald-400 font-semibold mb-2 flex items-center gap-2">
+                                            <span>✓</span> Good Choice
+                                        </div>
+                                        <div className="text-sm text-slate-300">
+                                            Your selected action is near-optimal and expected to minimize civilian casualties.
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Game Theory Matrix */}
+                            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 fade-in">
+                                <h2 className="text-lg font-semibold text-emerald-400 mb-6 flex items-center gap-2">
+                                    <span>▸</span> Game Theoretic Payoff Matrix
+                                </h2>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-700">
+                                                <th className="p-2 text-left text-blue-400">Counterinsurgent ↓</th>
+                                                <th className="p-2 text-center text-yellow-400">{insurgentState}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {[
+                                                counterinsurgentActions.find(a => a.name === counterinsurgentState) || {
+                                                    name: counterinsurgentState,
+                                                    expectedCasualties: currentActionCasualties,
+                                                    behaviors: counterinsurgentBehaviors
+                                                },
+                                                ...counterinsurgentActions.slice(0, 4)
+                                            ].slice(0, 5).map(action => {
+                                                const payoffs = calculatePayoffs(action, insurgentState);
+                                                const isCurrent = action.name === counterinsurgentState;
+                                                const isOptimal = action.name === optimalAction.name;
+                                                return (
+                                                    <tr key={action.name} className="border-b border-slate-800">
+                                                        <td className="p-2 font-semibold">
+                                                            {action.name}
+                                                            {isCurrent && <span className="text-blue-400 text-xs ml-2">← Selected</span>}
+                                                        </td>
+                                                        <td className={`p-2 text-center ${
+                                                            isCurrent ? 'bg-blue-900/30 border-2 border-blue-400' :
+                                                            isOptimal ? 'bg-emerald-900/30 border-2 border-emerald-400' : ''
+                                                        }`}>
+                                                            <div>
+                                                                <span className="text-blue-400">{payoffs.counterinsurgentPayoff.toFixed(1)}</span>
+                                                                <span className="text-slate-500"> / </span>
+                                                                <span className="text-yellow-400">{payoffs.insurgentPayoff.toFixed(1)}</span>
+                                                            </div>
+                                                            {isOptimal && !isCurrent && (
+                                                                <div className="text-xs text-emerald-400 mt-1">Optimal</div>
+                                                            )}
+                                                            {isCurrent && (
+                                                                <div className="text-xs text-blue-400 mt-1">Current</div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                    <div className="text-xs text-slate-400 mt-4">
+                                        Payoffs: (Counterinsurgent / Insurgent). Negative values represent casualties (costs).
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Monte Carlo Simulation */}
+                            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 fade-in">
+                                <h2 className="text-lg font-semibold text-emerald-400 mb-6 flex items-center gap-2">
+                                    <span>▸</span> Monte Carlo Simulation
+                                </h2>
+                                <div className="flex gap-4 mb-6 items-end">
+                                    <button 
+                                        className="bg-gradient-to-r from-emerald-500 to-blue-500 text-slate-900 px-6 py-3 rounded-lg font-bold hover:shadow-lg transition-all disabled:opacity-50"
+                                        onClick={runSimulation}
+                                        disabled={running}
+                                    >
+                                        {running ? 'RUNNING...' : 'RUN SIMULATION'}
+                                    </button>
+                                    <div>
+                                        <label className="text-xs text-slate-400 uppercase block mb-1">Simulations</label>
+                                        <input 
+                                            type="number" 
+                                            value={simulations}
+                                            onChange={(e) => setSimulations(parseInt(e.target.value))}
+                                            className="bg-slate-800 border border-slate-600 rounded px-3 py-2 w-24 text-white"
+                                            min="100"
+                                            max="10000"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-400 uppercase block mb-1">Days</label>
+                                        <input 
+                                            type="number" 
+                                            value={days}
+                                            onChange={(e) => setDays(parseInt(e.target.value))}
+                                            className="bg-slate-800 border border-slate-600 rounded px-3 py-2 w-24 text-white"
+                                            min="1"
+                                            max="90"
+                                        />
+                                    </div>
+                                </div>
+
+                                {results && (
+                                    <>
+                                        <div className="grid grid-cols-3 gap-3 mb-4">
+                                            <div className="bg-slate-800 rounded-lg p-3 text-center">
+                                                <div className="text-xs text-slate-400 uppercase">Mean</div>
+                                                <div className="text-2xl font-bold text-emerald-400">{results.mean.toFixed(1)}</div>
+                                                <div className="text-xs text-slate-400">total casualties</div>
+                                            </div>
+                                            <div className="bg-slate-800 rounded-lg p-3 text-center">
+                                                <div className="text-xs text-slate-400 uppercase">Median</div>
+                                                <div className="text-2xl font-bold text-yellow-400">{results.median.toFixed(1)}</div>
+                                                <div className="text-xs text-slate-400">total casualties</div>
+                                            </div>
+                                            <div className="bg-slate-800 rounded-lg p-3 text-center">
+                                                <div className="text-xs text-slate-400 uppercase">90% CI</div>
+                                                <div className="text-xl font-bold">
+                                                    {results.p5.toFixed(0)}-{results.p95.toFixed(0)}
+                                                </div>
+                                                <div className="text-xs text-slate-400">casualty range</div>
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-800 rounded-lg p-3 text-xs text-slate-400">
+                                            Based on {simulations.toLocaleString()} simulations of {days} days using: 
+                                            <strong className="text-emerald-400"> {results.action}</strong>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Distribution Chart */}
+                            {results && (
+                                <div className="lg:col-span-2 bg-slate-900 border border-slate-700 rounded-xl p-6 fade-in">
+                                    <h2 className="text-lg font-semibold text-emerald-400 mb-6 flex items-center gap-2">
+                                        <span>▸</span> Casualty Distribution ({days}-Day Projection)
+                                    </h2>
+                                    <div className="h-80">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={results.distribution}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                                <XAxis 
+                                                    dataKey="casualties" 
+                                                    stroke="#94a3b8"
+                                                    label={{ value: 'Total Casualties', position: 'insideBottom', offset: -5, fill: '#94a3b8' }}
+                                                />
+                                                <YAxis 
+                                                    stroke="#94a3b8"
+                                                    label={{ value: 'Frequency', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+                                                />
+                                                <Tooltip 
+                                                    contentStyle={{ 
+                                                        background: '#1e293b', 
+                                                        border: '1px solid #475569',
+                                                        borderRadius: '8px',
+                                                        color: '#f1f5f9'
+                                                    }}
+                                                />
+                                                <Bar dataKey="frequency" fill="#10b981" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<CounterinsurgencyDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
