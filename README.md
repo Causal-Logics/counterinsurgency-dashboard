@@ -1,4 +1,4 @@
-# counterinsurgency-dashboard
+# Counterinsurgency Dashboard
 Game Agentic Monte Carlo Simulation of Causal Logics in Counterinsurgency Operations
 - Structural causal logics often characterizes decisions made because of physical constraints, resources, or materials
 - Ideational causal elements include decisions derived from practices, symbols, norms, grammars, models, beliefs, ideas, and identities that carry meaning about the world
